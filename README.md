@@ -1,0 +1,11 @@
+
+  # C2C Marketplace Web App
+
+  This is a code bundle for C2C Marketplace Web App. The original project is available at https://www.figma.com/design/Ru5rldRwIZ4L3zogCmMrc7/C2C-Marketplace-Web-App.
+
+  ## Running the code
+
+  Run `npm i` to install the dependencies.
+
+  Run `npm run dev` to start the development server.
+  
