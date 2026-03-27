@@ -3,19 +3,31 @@ import { Link } from 'react-router';
 import { translations } from '../i18n/i18n';
 import { useLanguage } from '../i18n/LanguageProvider';
 
-// Slugs align 1-to-1 with the t.rules label arrays in both VI and EN
-const POLICY_SLUGS = [
-  'quy-tac-cong-dong',
-  'quy-dinh-dang-tin',
-  'chinh-sach-danh-gia',
-  'mat-hang-bi-cam',
-  'giai-quyet-tranh-chap',
-  'chinh-sach-bao-mat',
-] as const;
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebaseClient';
+import { useEffect, useState } from 'react';
 
 export function Footer() {
   const { lang } = useLanguage();
   const t = translations[lang].footer;
+  
+  const [policies, setPolicies] = useState<{ id: string; slug: string; title: string }[]>([]);
+
+  useEffect(() => {
+    const q = collection(db, 'policies');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedPolicies = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          slug: data.slug || doc.id,
+          title: data.title || 'Untitled Policy'
+        };
+      });
+      setPolicies(fetchedPolicies);
+    });
+    return () => unsubscribe();
+  }, []);
 
   return (
     <footer className="border-t border-gray-200 bg-white mt-16">
@@ -48,14 +60,14 @@ export function Footer() {
               {t.rulesTitle}
             </h3>
             <ul className="space-y-2.5">
-              {t.rules.map((rule, idx) => (
-                <li key={POLICY_SLUGS[idx] ?? idx}>
+              {policies.map((policy) => (
+                <li key={policy.id}>
                   <Link
-                    to={`/policy/${POLICY_SLUGS[idx] ?? idx}`}
+                    to={`/policy/${policy.slug}`}
                     className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-700 transition-colors group"
                   >
                     <ChevronRight size={12} className="text-gray-300 group-hover:text-blue-500 transition-colors" />
-                    {rule}
+                    {policy.title}
                   </Link>
                 </li>
               ))}

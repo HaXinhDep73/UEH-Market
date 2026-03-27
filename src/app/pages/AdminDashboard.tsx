@@ -15,12 +15,17 @@ import {
   Settings2,
   Ban,
   Unlock,
+  BookOpen,
+  Edit2,
+  Trash2,
+  FileText,
 } from 'lucide-react';
 import { categories } from '../data/catalog';
 import type { PendingProduct, PendingRating } from '../data/types';
 import { auth, db } from '../firebaseClient';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useNavigate } from 'react-router';
+
 import {
   collection,
   doc,
@@ -29,6 +34,9 @@ import {
   query,
   updateDoc,
   where,
+  addDoc,
+  deleteDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { formatTimestampToYYYYMMDD, mapFirestoreCategoryToUiCategoryId } from '../lib/uehMarketplaceFirebase';
 import { translations } from '../i18n/i18n';
@@ -41,7 +49,7 @@ import {
 } from '../lib/uehMarketplaceAuth';
 import { AssignPermissionsModal } from '../components/AssignPermissionsModal';
 
-type Tab = 'products' | 'ratings' | 'users';
+type Tab = 'products' | 'ratings' | 'users' | 'policies';
 type ItemStatus = 'pending' | 'approved' | 'rejected';
 
 const MASTER_ADMIN_EMAIL = 'anniversary@ueh.vn';
@@ -83,6 +91,64 @@ export default function AdminDashboard() {
 
   // ── Action alerts ─────────────────────────────────────────────────
   const [actionAlert, setActionAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // ── Policies ──────────────────────────────────────────────────────
+  const [policies, setPolicies] = useState<any[]>([]);
+  const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null);
+  const [policyForm, setPolicyForm] = useState({ title: '', slug: '', content: '' });
+  const [savingPolicy, setSavingPolicy] = useState(false);
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTitle = e.target.value;
+    setPolicyForm(prev => {
+      const generateSlug = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const isAutoSlug = prev.slug === '' || prev.slug === generateSlug(prev.title);
+      return {
+        ...prev,
+        title: newTitle,
+        slug: isAutoSlug ? generateSlug(newTitle) : prev.slug
+      };
+    });
+  };
+
+  const handleSavePolicy = async () => {
+    if (!policyForm.title || !policyForm.slug || !policyForm.content) {
+      showAlert('error', 'Vui lòng điền đầy đủ tiêu đề, slug và nội dung.');
+      return;
+    }
+    setSavingPolicy(true);
+    try {
+      const payload = {
+        title: policyForm.title,
+        slug: policyForm.slug,
+        content: policyForm.content,
+        updatedAt: serverTimestamp()
+      };
+      if (editingPolicyId) {
+        await updateDoc(doc(db, 'policies', editingPolicyId), payload);
+        showAlert('success', '✓ Đã cập nhật chính sách.');
+      } else {
+        await addDoc(collection(db, 'policies'), payload);
+        showAlert('success', '✓ Đã tạo chính sách mới.');
+      }
+      setPolicyForm({ title: '', slug: '', content: '' });
+      setEditingPolicyId(null);
+    } catch (err: any) {
+      showAlert('error', `Lỗi lưu chính sách: ${err?.message}`);
+    } finally {
+      setSavingPolicy(false);
+    }
+  };
+
+  const handleDeletePolicy = async (id: string) => {
+    if (!window.confirm(t.cmsConfirmDelete)) return;
+    try {
+      await deleteDoc(doc(db, 'policies', id));
+      showAlert('success', '✓ Đã xóa chính sách.');
+    } catch (err: any) {
+      showAlert('error', `Lỗi xóa: ${err?.message}`);
+    }
+  };
 
   const showAlert = (type: 'success' | 'error', message: string) => {
     setActionAlert({ type, message });
@@ -283,6 +349,15 @@ export default function AdminDashboard() {
     return () => unsub();
   }, [activeTab, adminProfile]);
 
+  // ── Load policies when entering policies tab ──────────────────────
+  useEffect(() => {
+    if (activeTab !== 'policies' || currentUserEmail !== MASTER_ADMIN_EMAIL) return;
+    const unsub = onSnapshot(collection(db, 'policies'), (snap) => {
+      setPolicies(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [activeTab, currentUserEmail]);
+
   // ── Guards ───────────────────────────────────────────────────────
   if (checkingAdmin) return null;
   if (!adminProfile) return null;
@@ -316,6 +391,15 @@ export default function AdminDashboard() {
       activeColor: '#7c3aed',
       permission: 'manage_users' as Permission,
     },
+    ...(adminProfile.isMaster ? [{
+      key: 'policies' as Tab,
+      icon: <FileText size={16} />,
+      label: t.tabContent,
+      badge: 0,
+      badgeColor: '#059669',
+      activeColor: '#059669',
+      permission: 'manage_users' as Permission,
+    }] : []),
   ];
 
   const visibleTabs = allTabConfig.filter((tab) =>
@@ -767,6 +851,131 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             )}
+          </div>
+        )}
+
+        {/* ── POLICIES TAB ── */}
+        {activeTab === 'policies' && adminProfile.isMaster && (
+          <div className="p-6">
+            {actionAlert && (
+              <div
+                className={`mb-6 flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium border ${
+                  actionAlert.type === 'success'
+                    ? 'bg-green-50 text-green-700 border-green-200'
+                    : 'bg-red-50 text-red-700 border-red-200'
+                }`}
+              >
+                <span>{actionAlert.message}</span>
+                <button onClick={() => setActionAlert(null)} className="flex-shrink-0 p-1 rounded hover:bg-black/5">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            
+            <div className="flex flex-col lg:flex-row gap-8">
+              {/* Form */}
+              <div className="flex-1 bg-gray-50/50 border border-gray-100 p-5 rounded-2xl">
+                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <BookOpen size={18} className="text-emerald-600" />
+                  {editingPolicyId ? t.cmsEditPolicy : t.cmsNewPolicy}
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">{t.cmsPageTitle}</label>
+                    <input
+                      type="text"
+                      className="w-full text-sm px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                      value={policyForm.title}
+                      onChange={handleTitleChange}
+                      placeholder="Ví dụ: Quy tắc cộng đồng"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      {t.cmsSlug} <span className="font-normal text-gray-400">({t.cmsSlugHint})</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full text-sm px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-mono"
+                      value={policyForm.slug}
+                      onChange={(e) => setPolicyForm({ ...policyForm, slug: e.target.value })}
+                      placeholder="vi-du-quy-tac"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">{t.cmsContent}</label>
+                    <textarea
+                      rows={10}
+                      className="w-full text-sm px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all leading-relaxed"
+                      value={policyForm.content}
+                      onChange={(e) => setPolicyForm({ ...policyForm, content: e.target.value })}
+                      placeholder="..."
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      onClick={handleSavePolicy}
+                      disabled={savingPolicy}
+                      className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                    >
+                      {savingPolicy ? t.cmsSaving : t.cmsSave}
+                    </button>
+                    {editingPolicyId && (
+                      <button
+                        onClick={() => {
+                          setEditingPolicyId(null);
+                          setPolicyForm({ title: '', slug: '', content: '' });
+                        }}
+                        className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                      >
+                        {t.cmsCancel}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* List */}
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-800 mb-4">{t.cmsTitle}</h3>
+                {policies.length === 0 ? (
+                  <div className="text-center py-10 border border-dashed border-gray-200 rounded-2xl">
+                    <FileText size={32} className="text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">{t.cmsNoPolicy}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {policies.map(p => (
+                      <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-gray-100 hover:border-emerald-100 hover:shadow-sm transition-all group">
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-gray-800 truncate">{p.title}</h4>
+                          <div className="text-xs text-gray-400 font-mono mt-0.5 truncate">/policy/{p.slug}</div>
+                        </div>
+                        <div className="flex items-center gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => {
+                              setEditingPolicyId(p.id);
+                              setPolicyForm({ title: p.title ?? '', slug: p.slug ?? '', content: p.content ?? '' });
+                            }}
+                            className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                            title={t.cmsEditPolicy}
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePolicy(p.id)}
+                            className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                            title={t.cmsDelete}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
