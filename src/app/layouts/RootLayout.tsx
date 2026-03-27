@@ -1,18 +1,25 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router';
+import { Plus } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
+import { PostListingModal } from '../components/PostListingModal';
 import { auth } from '../firebaseClient';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebaseClient';
+import { useLanguage } from '../i18n/LanguageProvider';
+import { translations } from '../i18n/i18n';
+import { fetchAdminProfile } from '../lib/uehMarketplaceAuth';
 
 export default function RootLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { lang } = useLanguage();
+  const t = translations[lang].navbar;
+
   const [checked, setChecked] = useState(false);
   const [adminGateChecked, setAdminGateChecked] = useState(false);
   const [adminAllowed, setAdminAllowed] = useState(false);
+  const [fabModalOpen, setFabModalOpen] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -50,9 +57,8 @@ export default function RootLayout() {
       }
 
       try {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        const role = snap.exists() ? (snap.data() as any).role : 'user';
-        const allowed = role === 'admin';
+        const profile = await fetchAdminProfile(user.uid, user.email ?? undefined);
+        const allowed = profile.isAdmin;
 
         if (!cancelled) {
           setAdminAllowed(allowed);
@@ -87,6 +93,18 @@ export default function RootLayout() {
         <Outlet />
       </main>
       <Footer />
+
+      {/* Mobile FAB – Post Listing */}
+      <button
+        onClick={() => setFabModalOpen(true)}
+        className="md:hidden fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+        style={{ backgroundColor: '#C8A24B' }}
+        aria-label={t.postListing}
+      >
+        <Plus size={26} className="text-white" />
+      </button>
+
+      {fabModalOpen && <PostListingModal onClose={() => setFabModalOpen(false)} />}
     </div>
   );
 }

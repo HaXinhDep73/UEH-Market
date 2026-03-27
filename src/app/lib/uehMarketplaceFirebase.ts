@@ -1,7 +1,7 @@
 import type { Timestamp } from 'firebase/firestore';
 
 export const STUDENT_EMAIL_SUFFIX = '@st.ueh.edu.vn';
-export const DEFAULT_ADMIN_EMAIL = 'ueh.anni@gmail.com';
+export const DEFAULT_ADMIN_EMAIL = 'anniversary@ueh.vn';
 
 export function isStudentEmail(email: string) {
   return email.endsWith(STUDENT_EMAIL_SUFFIX);

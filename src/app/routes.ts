@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import ProductListingPage from './pages/ProductListingPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import AdminDashboard from './pages/AdminDashboard';
+import PolicyPage from './pages/PolicyPage';
 
 export const router = createBrowserRouter([
   {
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
       { path: 'category/:id', Component: ProductListingPage },
       { path: 'product/:id', Component: ProductDetailPage },
       { path: 'admin', Component: AdminDashboard },
+      { path: 'policy/:slug', Component: PolicyPage },
     ],
   },
 ]);

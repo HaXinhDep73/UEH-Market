@@ -11,7 +11,7 @@ import { useLanguage } from '../i18n/LanguageProvider';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { lang } = useLanguage();
+  const { lang, toggleLang } = useLanguage();
   const t = translations[lang].login;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -191,6 +191,16 @@ export default function LoginPage() {
         </div>
 
         <div className="w-full max-w-md">
+          {/* Language toggle */}
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={toggleLang}
+              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-gray-700 hover:bg-gray-100 transition-colors border border-gray-200 shadow-sm"
+              aria-label="Toggle language"
+            >
+              {lang === 'vi' ? 'EN' : 'VI'}
+            </button>
+          </div>
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
             <div className="mb-8">
               <h2 className="text-gray-900 mb-1.5" style={{ fontSize: '1.5rem', fontWeight: 700 }}>

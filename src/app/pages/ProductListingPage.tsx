@@ -5,8 +5,8 @@ import type { Product } from '../data/types';
 import { ProductCard } from '../components/ProductCard';
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '../firebaseClient';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { formatTimestampToYYYYMMDD, getInitials, mapUiCategoryIdToFirestoreCategory } from '../lib/uehMarketplaceFirebase';
+import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { formatTimestampToYYYYMMDD, getInitials } from '../lib/uehMarketplaceFirebase';
 
 const iconMap: Record<string, React.ReactNode> = {
   Sprout: <Sprout size={22} />,
@@ -45,25 +45,24 @@ export default function ProductListingPage() {
   }, [listingProducts, sort]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!category || !activeCategoryId) return;
-      setLoading(true);
-      const firestoreCategory = mapUiCategoryIdToFirestoreCategory(category.id);
-      if (!firestoreCategory) {
-        setListingProducts([]);
-        setLoading(false);
-        return;
-      }
+    if (!category || !activeCategoryId) return;
 
-      try {
-        const q = query(
-          collection(db, 'products'),
-          where('status', '==', 'approved'),
-          where('category', '==', firestoreCategory)
-        );
-        const snap = await getDocs(q);
+    setLoading(true);
 
+    // The category field in Firestore is stored as the UI category id (e.g. 'agriculture'),
+    // because PostListingModal saves `cat.id` directly as the value.
+    const firestoreCategory = category.id;
+    console.log('[ProductListingPage] Querying Firestore for category:', firestoreCategory);
+
+    const q = query(
+      collection(db, 'products'),
+      where('status', '==', 'approved'),
+      where('category', '==', firestoreCategory)
+    );
+
+    const unsub = onSnapshot(
+      q,
+      async (snap) => {
         const base = snap.docs.map((d) => {
           const data = d.data() as any;
           const createdAt = data.createdAt;
@@ -118,25 +117,22 @@ export default function ProductListingPage() {
 
         const withRatings = base.map((p) => {
           const r = ratingBySellerId.get(p.sellerId);
-          return {
-            ...p,
-            rating: r?.avg ?? 0,
-            reviewCount: r?.count ?? undefined,
-          };
+          return { ...p, rating: r?.avg ?? 0, reviewCount: r?.count ?? undefined };
         });
 
-        if (!cancelled) setListingProducts(withRatings);
-      } catch (e) {
-        if (!cancelled) setListingProducts([]);
-      } finally {
-        if (!cancelled) setLoading(false);
+        setListingProducts(withRatings);
+        setLoading(false);
+      },
+      (error) => {
+        // If this fires, it often means a missing Firestore Composite Index.
+        // The error message will contain a direct link to create it in the Firebase Console.
+        console.error('[ProductListingPage] onSnapshot error (check for missing Firestore composite index):', error);
+        setListingProducts([]);
+        setLoading(false);
       }
-    }
+    );
 
-    load();
-    return () => {
-      cancelled = true;
-    };
+    return () => unsub();
   }, [category, activeCategoryId]);
 
   if (!category) {

@@ -17,9 +17,8 @@ import {
 import { categories } from '../data/catalog';
 import type { Product } from '../data/types';
 import { StarRating, StarPicker } from '../components/StarRating';
-import { auth, db, storage } from '../firebaseClient';
+import { auth, db } from '../firebaseClient';
 import { addDoc, collection, getDoc, getDocs, query, serverTimestamp, where, doc } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { formatTimestampToYYYYMMDD, getInitials, mapFirestoreCategoryToUiCategoryId } from '../lib/uehMarketplaceFirebase';
 
 type ProductWithSellerId = Product & { sellerId: string };
@@ -137,10 +136,17 @@ export default function ProductDetailPage() {
     setSubmitting(true);
 
     try {
-      const path = `ratingsProofs/${product.id}/${currentUser.uid}/${Date.now()}_${proofFile.name}`;
-      const ref = storageRef(storage, path);
-      await uploadBytes(ref, proofFile);
-      const proofImage = await getDownloadURL(ref);
+      // Upload proof image to ImgBB
+      const imgbbKey = import.meta.env.VITE_IMGBB_API_KEY as string;
+      const formData = new FormData();
+      formData.append('image', proofFile);
+      const imgbbRes = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey}`, {
+        method: 'POST',
+        body: formData,
+      });
+      const imgbbData = await imgbbRes.json();
+      if (!imgbbData.success) throw new Error('Image upload failed');
+      const proofImage: string = imgbbData.data.url;
 
       await addDoc(collection(db, 'ratings'), {
         productId: product.id,

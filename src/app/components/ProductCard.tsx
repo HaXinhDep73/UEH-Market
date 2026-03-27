@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router';
 import { StarRating } from './StarRating';
 import type { Product } from '../data/types';
+import { translations } from '../i18n/i18n';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 interface ProductCardProps {
   product: Product;
@@ -8,9 +10,13 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   const navigate = useNavigate();
+  const { lang } = useLanguage();
+  const t = translations[lang].common;
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+
+  const localizedCondition = t.conditions[product.condition] ?? product.condition;
 
   return (
     <div
@@ -25,7 +31,7 @@ export function ProductCard({ product }: ProductCardProps) {
         />
         <div className="absolute top-2 right-2">
           <span className="bg-white/90 backdrop-blur-sm text-xs text-gray-600 px-2 py-0.5 rounded-full border border-gray-200">
-            {product.condition}
+            {localizedCondition}
           </span>
         </div>
       </div>
