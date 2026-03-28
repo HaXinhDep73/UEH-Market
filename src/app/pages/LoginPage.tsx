@@ -8,6 +8,8 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { DEFAULT_ADMIN_EMAIL, getStudentIdFromEmail, isStudentEmail } from '../lib/uehMarketplaceFirebase';
 import { translations } from '../i18n/i18n';
 import { useLanguage } from '../i18n/LanguageProvider';
+// @ts-ignore
+import backgroundBg from '../../assets/background.jpg';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -115,12 +117,12 @@ export default function LoginPage() {
       }
 
       // Ensure navigation happens immediately after Firestore step.
-      navigate('/', { replace: true });
+      navigate('/intro', { replace: true });
       // Extra fallback: if navigation is blocked for any reason.
       // (Should not normally be hit.)
       // eslint-disable-next-line no-restricted-globals
-      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-        window.location.href = '/';
+      if (typeof window !== 'undefined' && window.location.pathname !== '/intro') {
+        window.location.href = '/intro';
       }
     } catch (err: any) {
       setError(mapFirebaseAuthErrorToLang(err));
@@ -132,11 +134,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left – Hero */}
-      <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-12 overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-12 overflow-hidden bg-[#003c71]">
         <img
-          src={IMAGES.hero}
+          src={backgroundBg}
           alt="UEH Campus"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-contain"
         />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(27,58,107,0.88) 0%, rgba(27,58,107,0.65) 100%)' }} />
 

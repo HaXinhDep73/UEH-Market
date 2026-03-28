@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router';
-import heroBg from '../../assets/background/background.jpg';
+// @ts-ignore
+import heroBg from '../../assets/UEH_50Y.PNG';
 import { ArrowRight, Sprout, ChefHat, Plug, Sparkles, GraduationCap, Star, ShieldCheck, Users, Lock, Inbox } from 'lucide-react';
 import { categories } from '../data/catalog';
 import type { Product } from '../data/types';
@@ -110,11 +111,11 @@ export default function HomePage() {
     <div>
       {/* Hero Section */}
       <div
-        className="relative overflow-hidden min-h-[520px] flex items-center bg-cover bg-center bg-no-repeat"
+        className="relative overflow-hidden min-h-[350px] md:min-h-[520px] flex items-center bg-contain bg-center bg-no-repeat bg-[#e6e2d6]"
         style={{ backgroundImage: `url(${heroBg})` }}
       >
-        {/* Dark overlay for text readability */}
-        <div className="absolute inset-0 bg-black/30" />
+        {/* Subtle overlay for stats strip readability */}
+        <div className="absolute inset-0 bg-black/10" />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-20 w-full">
         </div>
