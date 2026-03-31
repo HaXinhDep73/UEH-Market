@@ -31,9 +31,7 @@ import {
   doc,
   getDoc,
   onSnapshot,
-  query,
   updateDoc,
-  where,
   addDoc,
   deleteDoc,
   serverTimestamp,
@@ -236,13 +234,14 @@ export default function AdminDashboard() {
     const subs: (() => void)[] = [];
 
     if (hasPermission(adminProfile, 'manage_products')) {
-      const q = query(collection(db, 'products'), where('status', '==', 'pending'));
       subs.push(
-        onSnapshot(q, (snap) => {
+        onSnapshot(collection(db, 'products'), (snap) => {
           const rows: (PendingProduct & { status: ItemStatus })[] = snap.docs.map((d) => {
             const data = d.data() as any;
             const uiCategoryId = mapFirestoreCategoryToUiCategoryId(data.category ?? '');
             const categoryName = uiCategoryId ? categories.find((c) => c.id === uiCategoryId)?.name : null;
+            const rawStatus = data.status as string;
+            const status: ItemStatus = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
             return {
               id: d.id,
               productName: data.title ?? '',
@@ -251,7 +250,7 @@ export default function AdminDashboard() {
               price: data.price ?? 0,
               submittedDate: formatTimestampToYYYYMMDD(data.createdAt),
               image: data.images?.[0] ?? '',
-              status: 'pending',
+              status,
             };
           });
           setProductItems(rows);
@@ -261,9 +260,8 @@ export default function AdminDashboard() {
 
     if (hasPermission(adminProfile, 'manage_ratings')) {
       let req = 0;
-      const q = query(collection(db, 'ratings'), where('status', '==', 'pending'));
       subs.push(
-        onSnapshot(q, (snap) => {
+        onSnapshot(collection(db, 'ratings'), (snap) => {
           const currentReq = ++req;
           async function mapRatings() {
             const raw = snap.docs.map((d) => {
@@ -291,15 +289,19 @@ export default function AdminDashboard() {
               buyerMap.set(bid, d?.email ?? d?.studentId ?? bid);
             }));
             if (currentReq !== req) return;
-            setRatingItems(raw.map((r) => ({
-              id: r.id,
-              productName: productMap.get(r.productId) ?? '',
-              reviewer: buyerMap.get(r.buyerId) ?? '',
-              rating: typeof r.rating === 'number' ? r.rating : 0,
-              comment: r.comment,
-              submittedDate: r.submittedDate,
-              status: 'pending',
-            })));
+            setRatingItems(raw.map((r) => {
+              const rawStatus = snap.docs.find((d) => d.id === r.id)?.data()?.status as string | undefined;
+              const status: ItemStatus = rawStatus === 'approved' || rawStatus === 'rejected' ? rawStatus : 'pending';
+              return {
+                id: r.id,
+                productName: productMap.get(r.productId) ?? '',
+                reviewer: buyerMap.get(r.buyerId) ?? '',
+                rating: typeof r.rating === 'number' ? r.rating : 0,
+                comment: r.comment,
+                submittedDate: r.submittedDate,
+                status,
+              };
+            }));
           }
           mapRatings().catch(() => {});
         })
@@ -429,19 +431,33 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleProductAction = async (id: string, action: 'approved' | 'rejected') => {
+  const handleProductAction = async (id: string, action: 'approved' | 'rejected' | 'pending') => {
     try {
       await updateDoc(doc(db, 'products', id), { status: action });
-      showAlert('success', action === 'approved' ? '✓ Product approved successfully.' : '✓ Product rejected.');
+      if (action === 'approved') showAlert('success', '✓ Product approved successfully.');
+      else if (action === 'rejected') showAlert('success', '✓ Product rejected.');
+      else showAlert('success', '✓ Đã hoàn tác.');
     } catch (err: any) {
       showAlert('error', `Failed to update product: ${err?.message ?? 'Unknown error'}`);
     }
   };
 
-  const handleRatingAction = async (id: string, action: 'approved' | 'rejected') => {
+  const handleDeleteProduct = async (id: string) => {
+    if (!window.confirm(t.confirmDeleteProduct)) return;
+    try {
+      await deleteDoc(doc(db, 'products', id));
+      showAlert('success', '✓ Đã xóa bài viết.');
+    } catch (err: any) {
+      showAlert('error', `Failed to delete product: ${err?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  const handleRatingAction = async (id: string, action: 'approved' | 'rejected' | 'pending') => {
     try {
       await updateDoc(doc(db, 'ratings', id), { status: action });
-      showAlert('success', action === 'approved' ? '✓ Rating approved successfully.' : '✓ Rating rejected.');
+      if (action === 'approved') showAlert('success', '✓ Rating approved successfully.');
+      else if (action === 'rejected') showAlert('success', '✓ Rating rejected.');
+      else showAlert('success', '✓ Đã hoàn tác.');
     } catch (err: any) {
       showAlert('error', `Failed to update rating: ${err?.message ?? 'Unknown error'}`);
     }
@@ -582,26 +598,32 @@ export default function AdminDashboard() {
                         <td className="px-4 py-4 hidden lg:table-cell"><span className="text-xs text-gray-400">{item.submittedDate}</span></td>
                         <td className="px-4 py-4"><StatusBadge status={item.status} /></td>
                         <td className="px-6 py-4">
-                          {item.status === 'pending' && hasPermission(adminProfile, 'manage_products') ? (
-                            <div className="flex items-center gap-2 justify-end">
-                              <button onClick={() => handleProductAction(item.id, 'approved')}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:opacity-90"
-                                style={{ backgroundColor: '#16a34a' }}>
-                                <Check size={13} /> {t.approve}
-                              </button>
-                              <button onClick={() => handleProductAction(item.id, 'rejected')}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-red-500 hover:bg-red-600">
-                                <X size={13} /> {t.reject}
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex justify-end">
-                              {item.status !== 'pending' && (
-                                <button onClick={() => setProductItems((prev) => prev.map((p) => p.id === item.id ? { ...p, status: 'pending' } : p))}
+                          <div className="flex items-center gap-2 justify-end">
+                            {item.status === 'pending' && hasPermission(adminProfile, 'manage_products') ? (
+                              <>
+                                <button onClick={() => handleProductAction(item.id, 'approved')}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:opacity-90"
+                                  style={{ backgroundColor: '#16a34a' }}>
+                                  <Check size={13} /> {t.approve}
+                                </button>
+                                <button onClick={() => handleProductAction(item.id, 'rejected')}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-red-500 hover:bg-red-600">
+                                  <X size={13} /> {t.reject}
+                                </button>
+                              </>
+                            ) : (
+                              item.status !== 'pending' && (
+                                <button onClick={() => handleProductAction(item.id, 'pending')}
                                   className="text-xs text-gray-400 hover:text-gray-600 underline">{t.undo}</button>
-                              )}
-                            </div>
-                          )}
+                              )
+                            )}
+                            {hasPermission(adminProfile, 'manage_products') && (
+                              <button onClick={() => handleDeleteProduct(item.id)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-600 border border-red-200 hover:bg-red-50 transition-colors">
+                                <Trash2 size={12} /> {t.deleteProduct}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -696,7 +718,7 @@ export default function AdminDashboard() {
                           ) : (
                             <div className="flex justify-end">
                               {item.status !== 'pending' && (
-                                <button onClick={() => setRatingItems((prev) => prev.map((r) => r.id === item.id ? { ...r, status: 'pending' } : r))}
+                                <button onClick={() => handleRatingAction(item.id, 'pending')}
                                   className="text-xs text-gray-400 hover:text-gray-600 underline">{t.undo}</button>
                               )}
                             </div>

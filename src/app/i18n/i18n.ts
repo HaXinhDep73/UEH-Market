@@ -103,6 +103,8 @@ export const translations: Record<
       approve: string;
       reject: string;
       undo: string;
+      deleteProduct: string;
+      confirmDeleteProduct: string;
       noProducts: string;
       noRatings: string;
       badgeApproved: string;
@@ -314,6 +316,8 @@ export const translations: Record<
       approve: 'Duyệt',
       reject: 'Từ chối',
       undo: 'Hoàn tác',
+      deleteProduct: 'Xóa',
+      confirmDeleteProduct: 'Bạn có chắc muốn xóa bài viết này? Hành động này không thể hoàn tác.',
       noProducts: 'Không có sản phẩm nào để hiển thị',
       noRatings: 'Không có đánh giá nào để hiển thị',
       badgeApproved: 'Đã duyệt',
@@ -528,6 +532,8 @@ export const translations: Record<
       approve: 'Approve',
       reject: 'Reject',
       undo: 'Undo',
+      deleteProduct: 'Delete',
+      confirmDeleteProduct: 'Are you sure you want to delete this listing? This action cannot be undone.',
       noProducts: 'No items to show',
       noRatings: 'No ratings to show',
       badgeApproved: 'Approved',
